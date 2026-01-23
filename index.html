@@ -14,7 +14,6 @@
         .hidden { display: none !important; }
         #activationScreen { background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; position: fixed; inset: 0; z-index: 100; }
         .glass-card { background: var(--card); border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; position: relative; }
-        /* QR Modal Style */
         #qrModal { background: rgba(0,0,0,0.8); display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; padding: 20px; }
     </style>
 </head>
@@ -22,19 +21,19 @@
 
     <div id="qrModal" onclick="this.style.display='none'">
         <div class="bg-white p-6 rounded-3xl text-center" onclick="event.stopPropagation()">
-            <p class="text-black font-black text-sm mb-4 uppercase italic">Scan to Pay</p>
+            <p class="text-black font-black text-xs mb-4 uppercase italic">Scan to Pay</p>
             <div id="qrcode" class="flex justify-center mb-4"></div>
             <p id="qrAmount" class="text-sky-500 font-black text-xl mb-4"></p>
-            <button onclick="document.getElementById('qrModal').style.display='none'" class="bg-gray-200 text-black px-6 py-2 rounded-full text-[10px] font-bold">CLOSE</button>
+            <button onclick="document.getElementById('qrModal').style.display='none'" class="bg-gray-100 text-black px-6 py-2 rounded-full text-[10px] font-bold uppercase">Close</button>
         </div>
     </div>
 
     <div id="activationScreen">
         <div class="w-full max-w-xs text-center">
             <h1 class="text-3xl font-black text-sky-400 uppercase italic">BILLING NEXA</h1>
-            <div class="bg-white/5 p-8 rounded-[32px] border border-white/10 mt-8 shadow-2xl">
+            <div class="bg-white/5 p-8 rounded-[32px] border border-white/10 mt-8">
                 <input type="text" id="licenseKey" placeholder="TRIAL123" class="w-full p-4 rounded-xl text-center bg-white/10 border border-sky-400/50 text-white mb-4 outline-none">
-                <button onclick="activateApp()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition">Unlock App</button>
+                <button onclick="activateApp()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition">Unlock</button>
             </div>
         </div>
     </div>
@@ -45,17 +44,11 @@
                 <h1 class="text-2xl font-black italic text-sky-500 uppercase">BILL <span class="opacity-20 text-black dark:text-white">PRO</span></h1>
                 <p class="text-[9px] font-bold opacity-50 uppercase tracking-widest" id="liveClock">00:00:00</p>
             </div>
-            <div class="flex gap-2 items-center">
-                <div id="trialCounter" class="hidden text-[8px] bg-red-500 text-white px-2 py-1 rounded-full font-bold animate-pulse">-- DAYS</div>
-                <button onclick="document.body.classList.toggle('dark-mode')" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center"><i class="fas fa-moon text-xs"></i></button>
-            </div>
+            <button onclick="document.body.classList.toggle('dark-mode')" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center"><i class="fas fa-moon text-xs"></i></button>
         </header>
 
         <div class="bg-sky-500 p-6 rounded-[28px] my-6 text-white shadow-xl flex justify-between items-center">
-            <div>
-                <p class="text-[10px] font-bold uppercase opacity-60">Total Sales</p>
-                <h2 id="totalSale" class="text-3xl font-black italic">₹ 0</h2>
-            </div>
+            <div><p class="text-[10px] font-bold uppercase opacity-60">Total Sales</p><h2 id="totalSale" class="text-3xl font-black italic">₹ 0</h2></div>
             <i class="fas fa-chart-line text-3xl opacity-20"></i>
         </div>
 
@@ -87,7 +80,16 @@
 
     <script>
         const KEYS = { trial: "TRIAL123", full: "Permanentkey63793119" };
-        let billData = JSON.parse(localStorage.getItem('bill_data_v1')) || [];
+        
+        // --- DATA SAVER: Purana data dhoondne ke liye ---
+        const versions = ['bill_data_v1', 'bill_data_final'];
+        let combined = [];
+        versions.forEach(v => {
+            const d = JSON.parse(localStorage.getItem(v)) || [];
+            combined = [...combined, ...d];
+        });
+        let billData = Array.from(new Map(combined.map(b => [b.id, b])).values());
+        localStorage.setItem('bill_data_final', JSON.stringify(billData));
 
         function activateApp() {
             const val = document.getElementById('licenseKey').value.trim();
@@ -99,28 +101,25 @@
             document.getElementById('activationScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             if(type === 'Permanent') document.getElementById('backupBtn').classList.remove('hidden');
-            else { document.getElementById('trialCounter').classList.remove('hidden'); updateTimer(); }
             render();
-        }
-
-        function updateTimer() {
-            const start = localStorage.getItem('bill_start');
-            setInterval(() => {
-                const diff = (2 - (Date.now() - start) / (1000 * 60 * 60 * 24)).toFixed(1);
-                document.getElementById('trialCounter').innerText = `${diff} DAYS`;
-                if(diff <= 0) { localStorage.removeItem('bill_auth'); location.reload(); }
-            }, 1000);
         }
 
         function generateBill() {
             const n = document.getElementById('custName').value, item = document.getElementById('itemName').value;
-            const p = parseFloat(document.getElementById('itemPrice').value) || 0;
-            const q = parseFloat(document.getElementById('itemQty').value) || 1;
+            const p = parseFloat(document.getElementById('itemPrice').value) || 0, q = parseFloat(document.getElementById('itemQty').value) || 1;
             if(n && item) {
                 billData.unshift({ id: Date.now(), n, item, p, q, total: p * q, date: new Date().toLocaleDateString() });
-                localStorage.setItem('bill_data_v1', JSON.stringify(billData));
+                localStorage.setItem('bill_data_final', JSON.stringify(billData));
                 render();
                 document.querySelectorAll('input').forEach(i => i.value = '');
+            }
+        }
+
+        function deleteBill(id) {
+            if(confirm("Bhai, kya aap ye bill delete karna chahte hain?")) {
+                billData = billData.filter(b => b.id !== id);
+                localStorage.setItem('bill_data_final', JSON.stringify(billData));
+                render();
             }
         }
 
@@ -128,8 +127,7 @@
             document.getElementById('qrcode').innerHTML = "";
             new QRCode(document.getElementById("qrcode"), {
                 text: "upi://pay?pa=8882737014@ptsbi&pn=Khagesh&am=" + amount + "&cu=INR",
-                width: 180,
-                height: 180
+                width: 180, height: 180
             });
             document.getElementById('qrAmount').innerText = "₹" + amount;
             document.getElementById('qrModal').style.display = 'flex';
@@ -141,11 +139,12 @@
             list.innerHTML = billData.map(b => {
                 grandTotal += b.total;
                 return `<div class="glass-card p-4">
-                    <button onclick="if(confirm('Delete?')){billData=billData.filter(x=>x.id!=${b.id});localStorage.setItem('bill_data_v1',JSON.stringify(billData));render();}" class="absolute top-3 right-3 text-rose-500 opacity-20"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                    <button onclick="deleteBill(${b.id})" class="absolute top-3 right-3 text-rose-500 opacity-20 hover:opacity-100 transition"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                    
                     <div class="flex justify-between items-center">
                         <div><p class="text-[7px] opacity-40 uppercase">${b.date}</p><h3 class="text-xs font-black uppercase italic">${b.n}</h3><p class="text-[10px] text-sky-500 font-bold">${b.item} (x${b.q})</p></div>
-                        <div class="text-right"><p class="text-sm font-black italic">₹${b.total}</p>
-                            <div class="flex gap-2 mt-1">
+                        <div class="text-right pr-6"><p class="text-sm font-black italic">₹${b.total}</p>
+                            <div class="flex gap-3 mt-1 justify-end">
                                 <button onclick="window.open('https://wa.me/918882737014?text=Bill: ₹${b.total}')" class="text-emerald-500 text-xs"><i class="fab fa-whatsapp"></i></button>
                                 <button onclick="showQR(${b.total})" class="text-sky-500 text-xs"><i class="fas fa-qrcode"></i></button>
                             </div>
@@ -158,12 +157,11 @@
 
         function exportBills() {
             let win = window.open('', '_blank');
-            win.document.write(`<html><body><h1>SALES RECORD</h1><table border="1" style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Total</th></tr></thead><tbody>${billData.map(b => `<tr><td>${b.date}</td><td>${b.n}</td><td>${b.item}</td><td>₹${b.total}</td></tr>`).join('')}</tbody></table><script>window.print();<\/script></body></html>`);
+            win.document.write(`<html><body style="font-family:sans-serif"><h1>NEXA BILLING RECORDS</h1><table border="1" cellpadding="10" style="width:100%;border-collapse:collapse"><thead><tr style="background:#0ea5e9;color:white"><th>Date</th><th>Customer</th><th>Item</th><th>Total</th></tr></thead><tbody>${billData.map(b => `<tr><td>${b.date}</td><td>${b.n}</td><td>${b.item}</td><td>₹${b.total}</td></tr>`).join('')}</tbody></table><script>window.print();<\/script></body></html>`);
         }
 
         setInterval(() => { document.getElementById('liveClock').innerText = new Date().toLocaleTimeString(); }, 1000);
         window.onload = () => { if(localStorage.getItem('bill_auth')) launchApp(localStorage.getItem('bill_auth') === 'FULL' ? 'Permanent' : 'Trial'); }
     </script>
 </body>
-                    </html>
-                    
+</html>
