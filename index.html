@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Billing-Nexa Pro | Khagesh ai-nexa</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --bg: #ffffff; --text: #000000; --card: #f8fafc; }
@@ -13,16 +14,27 @@
         .hidden { display: none !important; }
         #activationScreen { background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; position: fixed; inset: 0; z-index: 100; }
         .glass-card { background: var(--card); border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; position: relative; }
+        /* QR Modal Style */
+        #qrModal { background: rgba(0,0,0,0.8); display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; padding: 20px; }
     </style>
 </head>
 <body class="max-w-md mx-auto p-5 pb-24">
+
+    <div id="qrModal" onclick="this.style.display='none'">
+        <div class="bg-white p-6 rounded-3xl text-center" onclick="event.stopPropagation()">
+            <p class="text-black font-black text-sm mb-4 uppercase italic">Scan to Pay</p>
+            <div id="qrcode" class="flex justify-center mb-4"></div>
+            <p id="qrAmount" class="text-sky-500 font-black text-xl mb-4"></p>
+            <button onclick="document.getElementById('qrModal').style.display='none'" class="bg-gray-200 text-black px-6 py-2 rounded-full text-[10px] font-bold">CLOSE</button>
+        </div>
+    </div>
 
     <div id="activationScreen">
         <div class="w-full max-w-xs text-center">
             <h1 class="text-3xl font-black text-sky-400 uppercase italic">BILLING NEXA</h1>
             <div class="bg-white/5 p-8 rounded-[32px] border border-white/10 mt-8 shadow-2xl">
                 <input type="text" id="licenseKey" placeholder="TRIAL123" class="w-full p-4 rounded-xl text-center bg-white/10 border border-sky-400/50 text-white mb-4 outline-none">
-                <button onclick="activateApp()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition">Unlock Billing</button>
+                <button onclick="activateApp()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition">Unlock App</button>
             </div>
         </div>
     </div>
@@ -30,7 +42,7 @@
     <div id="mainApp" class="hidden">
         <header class="flex justify-between items-center py-4">
             <div>
-                <h1 class="text-2xl font-black italic text-sky-500 uppercase">BILL <span class="opacity-20 text-black dark:text-white">NEXA</span></h1>
+                <h1 class="text-2xl font-black italic text-sky-500 uppercase">BILL <span class="opacity-20 text-black dark:text-white">PRO</span></h1>
                 <p class="text-[9px] font-bold opacity-50 uppercase tracking-widest" id="liveClock">00:00:00</p>
             </div>
             <div class="flex gap-2 items-center">
@@ -41,22 +53,21 @@
 
         <div class="bg-sky-500 p-6 rounded-[28px] my-6 text-white shadow-xl flex justify-between items-center">
             <div>
-                <p class="text-[10px] font-bold uppercase opacity-60">Today's Sale</p>
+                <p class="text-[10px] font-bold uppercase opacity-60">Total Sales</p>
                 <h2 id="totalSale" class="text-3xl font-black italic">₹ 0</h2>
             </div>
             <i class="fas fa-chart-line text-3xl opacity-20"></i>
         </div>
 
-        <div class="glass-card p-5 mb-8 shadow-sm">
-            <p class="text-[9px] font-bold uppercase opacity-40 mb-3 tracking-widest">New Invoice</p>
+        <div class="glass-card p-5 mb-8">
             <div class="space-y-3">
                 <input type="text" id="custName" placeholder="Customer Name" class="w-full p-3 bg-white dark:bg-transparent border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none">
-                <input type="text" id="itemName" placeholder="Item Name / Service" class="w-full p-3 bg-white dark:bg-transparent border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none">
+                <input type="text" id="itemName" placeholder="Item Name" class="w-full p-3 bg-white dark:bg-transparent border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none">
                 <div class="grid grid-cols-2 gap-2">
                     <input type="number" id="itemPrice" placeholder="Price (₹)" class="p-3 bg-white dark:bg-transparent border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none">
                     <input type="number" id="itemQty" placeholder="Qty" class="p-3 bg-white dark:bg-transparent border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none">
                 </div>
-                <button onclick="generateBill()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95 transition">Generate Bill</button>
+                <button onclick="generateBill()" class="w-full bg-sky-500 text-white py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition">Generate Bill</button>
             </div>
         </div>
 
@@ -76,16 +87,7 @@
 
     <script>
         const KEYS = { trial: "TRIAL123", full: "Permanentkey63793119" };
-        
-        // --- DATA SAVER ---
-        const bVersions = ['bill_data_v1'];
-        let bCombined = [];
-        bVersions.forEach(v => {
-            const d = JSON.parse(localStorage.getItem(v)) || [];
-            bCombined = [...bCombined, ...d];
-        });
-        let billData = Array.from(new Map(bCombined.map(b => [b.id, b])).values());
-        localStorage.setItem('bill_data_v1', JSON.stringify(billData));
+        let billData = JSON.parse(localStorage.getItem('bill_data_v1')) || [];
 
         function activateApp() {
             const val = document.getElementById('licenseKey').value.trim();
@@ -115,20 +117,22 @@
             const p = parseFloat(document.getElementById('itemPrice').value) || 0;
             const q = parseFloat(document.getElementById('itemQty').value) || 1;
             if(n && item) {
-                const total = p * q;
-                billData.unshift({ id: Date.now(), n, item, p, q, total, date: new Date().toLocaleDateString() });
+                billData.unshift({ id: Date.now(), n, item, p, q, total: p * q, date: new Date().toLocaleDateString() });
                 localStorage.setItem('bill_data_v1', JSON.stringify(billData));
                 render();
                 document.querySelectorAll('input').forEach(i => i.value = '');
             }
         }
 
-        function deleteBill(id) {
-            if(confirm("Delete this bill?")) {
-                billData = billData.filter(b => b.id !== id);
-                localStorage.setItem('bill_data_v1', JSON.stringify(billData));
-                render();
-            }
+        function showQR(amount) {
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: "upi://pay?pa=8882737014@ptsbi&pn=Khagesh&am=" + amount + "&cu=INR",
+                width: 180,
+                height: 180
+            });
+            document.getElementById('qrAmount').innerText = "₹" + amount;
+            document.getElementById('qrModal').style.display = 'flex';
         }
 
         function render() {
@@ -137,18 +141,13 @@
             list.innerHTML = billData.map(b => {
                 grandTotal += b.total;
                 return `<div class="glass-card p-4">
-                    <button onclick="deleteBill(${b.id})" class="absolute top-3 right-3 text-rose-500 opacity-20"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                    <button onclick="if(confirm('Delete?')){billData=billData.filter(x=>x.id!=${b.id});localStorage.setItem('bill_data_v1',JSON.stringify(billData));render();}" class="absolute top-3 right-3 text-rose-500 opacity-20"><i class="fas fa-trash-alt text-[10px]"></i></button>
                     <div class="flex justify-between items-center">
-                        <div>
-                            <p class="text-[7px] opacity-40 uppercase">${b.date}</p>
-                            <h3 class="text-xs font-black uppercase italic">${b.n}</h3>
-                            <p class="text-[10px] text-sky-500 font-bold">${b.item} (x${b.q})</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm font-black italic">₹${b.total}</p>
+                        <div><p class="text-[7px] opacity-40 uppercase">${b.date}</p><h3 class="text-xs font-black uppercase italic">${b.n}</h3><p class="text-[10px] text-sky-500 font-bold">${b.item} (x${b.q})</p></div>
+                        <div class="text-right"><p class="text-sm font-black italic">₹${b.total}</p>
                             <div class="flex gap-2 mt-1">
-                                <button onclick="window.open('https://wa.me/918882737014?text=Bill for ${b.n}: ${b.item} - ₹${b.total}')" class="text-emerald-500 text-xs"><i class="fab fa-whatsapp"></i></button>
-                                <button onclick="alert('QR for ₹${b.total} generated!')" class="text-sky-500 text-xs"><i class="fas fa-qrcode"></i></button>
+                                <button onclick="window.open('https://wa.me/918882737014?text=Bill: ₹${b.total}')" class="text-emerald-500 text-xs"><i class="fab fa-whatsapp"></i></button>
+                                <button onclick="showQR(${b.total})" class="text-sky-500 text-xs"><i class="fas fa-qrcode"></i></button>
                             </div>
                         </div>
                     </div>
@@ -159,16 +158,12 @@
 
         function exportBills() {
             let win = window.open('', '_blank');
-            win.document.write(`<html><head><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #eee;padding:12px;text-align:left;} th{background:#0ea5e9;color:white;}</style></head><body>
-                <h1 style="color:#0ea5e9">SALES RECORD - NEXA BILLING</h1>
-                <table><thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
-                <tbody>${billData.map(b => `<tr><td>${b.date}</td><td>${b.n}</td><td>${b.item}</td><td>${b.q}</td><td>₹${b.total}</td></tr>`).join('')}</tbody>
-                </table><script>window.print();<\/script></body></html>`);
+            win.document.write(`<html><body><h1>SALES RECORD</h1><table border="1" style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Total</th></tr></thead><tbody>${billData.map(b => `<tr><td>${b.date}</td><td>${b.n}</td><td>${b.item}</td><td>₹${b.total}</td></tr>`).join('')}</tbody></table><script>window.print();<\/script></body></html>`);
         }
 
         setInterval(() => { document.getElementById('liveClock').innerText = new Date().toLocaleTimeString(); }, 1000);
         window.onload = () => { if(localStorage.getItem('bill_auth')) launchApp(localStorage.getItem('bill_auth') === 'FULL' ? 'Permanent' : 'Trial'); }
     </script>
 </body>
-  </html>
-  
+                    </html>
+                    
